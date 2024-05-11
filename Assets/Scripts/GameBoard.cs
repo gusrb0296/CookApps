@@ -1,24 +1,86 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
+
+#region Cell_Class
+
+/// <summary>
+/// GameBoard를 이루는 한칸 한칸의 Cell
+/// </summary>
+public class Cell
+{
+    private int cell_x, cell_y;
+
+    Character characterInCell;
+
+
+    private bool isOccupied;
+    public bool IsOccupied { get { return isOccupied; } set { } }
+
+
+    private Vector3 cell_position;
+    public Vector3 position => cell_position;
+
+    public Cell(Vector3 offset, Vector3 size, int x, int y)
+    {
+        Vector3 dx = new Vector3(size.x, 0, 0);
+        Vector3 dy = new Vector3(0, size.y, 0);
+        cell_x = x;
+        cell_y = y;
+        cell_position = offset + cell_x * dx + cell_y * dy;
+    }
+
+    public void SetCharacter(Character character)
+    {
+        if (character == null)
+        {
+            isOccupied = false;
+        }
+        else
+        {
+            characterInCell = character;
+            isOccupied = true;
+        }
+    }
+
+    //    public Cannon GetCannon()
+    //    {
+    //        if (m_isOccupied)
+    //        {
+    //            return m_cannon;
+    //        }
+    //        else
+    //        {
+    //            return null;
+    //        }
+    //    }
+
+    public void SetIsOccupied(bool value)
+    {
+        isOccupied = value;
+    }
+}
+
+#endregion
+
 
 public class GameBoard : MonoBehaviour
 {
+    [SerializeField] Button btn_test;
+
+    // 좌측 하단을 시작으로 우측 상단까지 Board를 그림
     public Transform leftBottom, rightTop;
 
-    private int[] dx = new int[8] { 1, 1, 0, -1, -1, -1, 0, 1 };
-    private int[] dy = new int[8] { 0, -1, -1, -1, 0, 1, 1, 1 };
+    //private int[] dx = new int[8] { 1, 1, 0, -1, -1, -1, 0, 1 };
+    //private int[] dy = new int[8] { 0, -1, -1, -1, 0, 1, 1, 1 };
 
     private Cell[,] m_gameBoard;
     private int m_width, m_height;
-    public int Width
-    {
-        get { return m_width; }
-    }
-    public int Height
-    {
-        get { return m_height; }
-    }
+
+    public int Width => m_width;
+    public int Height => m_height;
+
     private Vector3 m_offset;
     private Vector3 m_cellSize;
 
@@ -54,13 +116,17 @@ public class GameBoard : MonoBehaviour
         return GetCell(pos.x, pos.y);
     }
 
-    public Cell GetCell(float x, float y)
+    Cell GetCell(float x, float y)
     {
         int _x = Mathf.RoundToInt((x - m_offset.x) / m_cellSize.x);
         int _y = Mathf.RoundToInt((y - m_offset.y) / m_cellSize.y);
         _x = Mathf.Clamp(_x, 0, m_width - 1);
         _y = Mathf.Clamp(_y, 0, m_height - 1);
-        return m_gameBoard[_x, _y];
+
+        if (!m_gameBoard[_x, _y].IsOccupied)
+            return m_gameBoard[_x, _y];
+        else
+            return null;
     }
 
     public List<Cell> GetAdjacentCells(Vector3 v)
@@ -68,7 +134,10 @@ public class GameBoard : MonoBehaviour
         return GetAdjacentCells(v.x, v.y);
     }
 
-    public List<Cell> GetAdjacentCells(float x, float y)
+    private int[] dx = new int[8] { 1, 1, 0, -1, -1, -1, 0, 1 };
+    private int[] dy = new int[8] { 0, -1, -1, -1, 0, 1, 1, 1 };
+
+    List<Cell> GetAdjacentCells(float x, float y)
     {
         int _x = Mathf.RoundToInt((x - m_offset.x) / m_cellSize.x);
         int _y = Mathf.RoundToInt((y - m_offset.y) / m_cellSize.y);
@@ -78,13 +147,71 @@ public class GameBoard : MonoBehaviour
         for (int i = 0; i < 8; i++)
         {
             if (_x + dx[i] < 0 || _y + dy[i] < 0 || _x + dx[i] >= m_width || _y + dy[i] >= m_height) continue;
+
+
             cells.Add(m_gameBoard[_x + dx[i], _y + dy[i]]);
         }
         return cells;
     }
 
+    public List<Cell> FindPath(Cell startCell, List<Vector2> targetPositions)
+    {
+        // 목표 셀로 변환
+        List<Cell> targetCells = new List<Cell>();
+        foreach (Vector2 pos in targetPositions)
+        {
+            Cell cell = GetCell(pos);
+            if (cell != null && !cell.IsOccupied)
+                targetCells.Add(cell);
+        }
 
-    private void OnDrawGizmosSelected()
+        // BFS 초기화
+        Queue<Cell> queue = new Queue<Cell>();
+        Dictionary<Cell, Cell> cameFrom = new Dictionary<Cell, Cell>();
+        queue.Enqueue(startCell);
+        cameFrom[startCell] = null;
+
+        // BFS 실행
+        Cell current = null;
+        while (queue.Count > 0)
+        {
+            current = queue.Dequeue();
+
+            // 목표 도달 시 중단
+            if (targetCells.Contains(current))
+                break;
+
+            foreach (Cell neighbor in GetAdjacentCells(new Vector2(current.position.x, current.position.y)))
+            {
+                if (neighbor != null && !cameFrom.ContainsKey(neighbor) && !neighbor.IsOccupied)
+                {
+                    queue.Enqueue(neighbor);
+                    cameFrom[neighbor] = current;
+                }
+            }
+        }
+
+        // 경로 재구성
+        List<Cell> path = new List<Cell>();
+        if (targetCells.Contains(current))
+        {
+            while (current != null)
+            {
+                print($"{current.position.x}, {current.position.y}");
+                path.Add(current);                
+                current = cameFrom[current];
+            }
+            path.Reverse();
+        }
+
+        return path;
+    }
+
+
+    #region DrawGizmos
+
+    // 게임을 시작하고, 에디터 상으로 hierarchy의 GameBoard를 클릭하면 그리드가 보입니다.
+    void OnDrawGizmosSelected()
     {
         try
         {
@@ -109,50 +236,6 @@ public class GameBoard : MonoBehaviour
             Debug.LogError(e);
         }
     }
-}
 
-public class Cell
-{
-    private int m_x, m_y;
-    private Vector3 m_position;
-    private bool m_isOccupied;
-    public bool IsOccupied { get { return m_isOccupied; } }
-    public Vector3 position
-    {
-        get { return m_position; }
-    }
-
-    public Cell(Vector3 offset, Vector3 size, int x, int y)
-    {
-        Vector3 dx = new Vector3(size.x, 0, 0);
-        Vector3 dy = new Vector3(0, size.y, 0);
-        m_x = x;
-        m_y = y;
-        m_position = offset + m_x * dx + m_y * dy;
-    }
-
-    //public void SetCannon(Cannon cannon)
-    //{
-    //    if (cannon == null)
-    //    {
-    //        m_isOccupied = false;
-    //    }
-    //    else
-    //    {
-    //        m_cannon = cannon;
-    //        m_isOccupied = true;
-    //    }
-    //}
-
-    //public Cannon GetCannon()
-    //{
-    //    if (m_isOccupied)
-    //    {
-    //        return m_cannon;
-    //    }
-    //    else
-    //    {
-    //        return null;
-    //    }
-    //}
+    #endregion
 }
