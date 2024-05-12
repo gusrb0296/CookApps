@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 public class DragAndDrop : MonoBehaviour
@@ -11,9 +12,19 @@ public class DragAndDrop : MonoBehaviour
 
     GameBoard gameBoard;
 
+    List<Vector2> enemyPosList = new List<Vector2>();
+
     private void Start()
     {
         gameBoard = GameManager.Instance.gameBoard;
+
+        Vector2 enemy1 = new Vector2(3, 0);
+        Vector2 enemy2 = new Vector2(3, 1);
+        Vector2 enemy3 = new Vector2(3, 2);
+
+        enemyPosList.Add(enemy1);
+        enemyPosList.Add(enemy2);
+        enemyPosList.Add(enemy3);
     }
 
 
@@ -56,6 +67,7 @@ public class DragAndDrop : MonoBehaviour
         transform.position = nearestCell.position;
         img_Shadow.gameObject.SetActive(false);
         nearestCell.SetCharacter(character);
+        gameBoard.FindPath(nearestCell, enemyPosList);
     }
 
     // 화면의 마우스 위치를 반환함
